@@ -2,6 +2,12 @@
 
 本项目是CS2205课程的大作业，旨在让学生使用Coq定理证明器完成四个经典图论算法的正确性证明。
 
+## 项目仓库
+
+git clone https://github.com/liukanooo/CS2205-TheoryTask-Graph.git
+cd CS2205-TheoryTask-Graph
+git submodule update --init --recursive
+
 ## 项目概述
 
 本作业要求学生证明以下四个经典图论算法的正确性：
