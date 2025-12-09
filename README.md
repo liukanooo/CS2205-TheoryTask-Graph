@@ -4,9 +4,11 @@
 
 ## 项目仓库
 
+```
 git clone https://github.com/liukanooo/CS2205-TheoryTask-Graph.git
 cd CS2205-TheoryTask-Graph
 git submodule update --init --recursive
+```
 
 ## 项目概述
 
