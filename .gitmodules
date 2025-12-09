@@ -1,0 +1,20 @@
+[submodule "ExListLib"]
+	path = ExListLib
+	url = https://github.com/liukanooo/ExListLib.git
+[submodule "ListLib"]
+	path = ListLib
+	url = https://github.com/liukanooo/ListLib.git
+[submodule "MaxMinLib"]
+	path = MaxMinLib
+	url = https://github.com/liukanooo/MaxMinLib.git
+[submodule "monadlib"]
+	path = monadlib
+	url = https://look31242@bitbucket.org/Wushushu/monadlib.git
+	branch = cs2205-local
+[submodule "sets"]
+	path = sets
+	url = https://look31242@bitbucket.org/qinxiang-SJTU/sets.git
+	branch = cs2205-local
+[submodule "fixedpoints"]
+	path = fixedpoints
+	url = https://look31242@bitbucket.org/qinxiang-SJTU/fixedpoints.git

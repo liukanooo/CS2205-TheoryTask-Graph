@@ -13,7 +13,7 @@ COQ_FLAG = -Q $(CURRENT_DIR) GraphLib \
 DEP_FLAG = -Q $(CURRENT_DIR) GraphLib \
            -R ../sets SetsClass \
            -R ../algorithms Algorithms \
-		   -R ../MaxMinLib MinMaxLib \
+		   -R ../MaxMinLib MaxMinLib \
 		   -R ../ListLib ListLib
 
 BASE_FILES = graph_basic.v Syntax.v GraphLib.v
