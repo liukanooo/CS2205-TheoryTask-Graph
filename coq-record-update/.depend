@@ -1,0 +1,4 @@
+./src/Lens.vo ./src/Lens.glob ./src/Lens.v.beautified ./src/Lens.required_vo: ./src/Lens.v ./src/RecordSet.vo
+./src/RecordEta.vo ./src/RecordEta.glob ./src/RecordEta.v.beautified ./src/RecordEta.required_vo: ./src/RecordEta.v 
+./src/RecordSet.vo ./src/RecordSet.glob ./src/RecordSet.v.beautified ./src/RecordSet.required_vo: ./src/RecordSet.v ./src/RecordEta.vo
+./src/RecordUpdate.vo ./src/RecordUpdate.glob ./src/RecordUpdate.v.beautified ./src/RecordUpdate.required_vo: ./src/RecordUpdate.v ./src/RecordEta.vo ./src/RecordSet.vo
