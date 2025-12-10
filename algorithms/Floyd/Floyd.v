@@ -7,7 +7,7 @@ Require Import Coq.micromega.Psatz.
 Require Import SetsClass.SetsClass.
 From RecordUpdate Require Import RecordUpdate.
 From MonadLib.StateRelMonad Require Import StateRelBasic StateRelHoare FixpointLib.
-From GraphLib Require Import graph_basic reachable_basic examples.floyd path vpath.
+From GraphLib Require Import graph_basic reachable_basic path vpath eweight.
 From MaxMinLib Require Import MaxMin.
 Require Import Algorithms.MapLib.
 
@@ -32,23 +32,29 @@ Section Floyd.
       * 对于 i0 >= i: dist[i0][j] = shortestPath(i0, j, k-1)
 *)
 
-Context {V: Type}
-        `{eq_dec: EqDec V eq}
-        (g: OriginalGraphType V)
-        {origin_gvalid: OriginalGraph_gvalid g}
-        {P: Type}
-        {path: path.Path (OriginalGraphType V) V (V * V) P}.
+Context {G V E: Type}
+        {pg: Graph G V E}
+        {gv: GValid G}
+        (g: G)
+        {eq_dec: EqDec (V * V) eq}.
+
+Context {P: Type}
+        {path: Path G V E P}.
+
+Context {W: Type}
+        (W_le: W -> W -> Prop)
+        {W_le_totalorder: TotalOrder W_le}
+        (W_plus: W -> W -> W)
+        {W_plus_group: Group W_plus}
+        {infweight: InfWeight W_le W_plus}
+        {ew: EdgeWeight G V E W W_le W_plus}.
 
 Notation step := (step g).
 Notation reachable := (reachable g).
 
 Record St: Type := mkSt {
-  dist: (V * V) -> option nat;
+  dist: (V * V) -> W;
 }.
-
-Definition initSt: St := {|
-  dist := original_weight g;
-|}.
 
 Instance: Settable St := settable! mkSt <dist>.
 
@@ -56,118 +62,74 @@ Instance: Settable St := settable! mkSt <dist>.
 (** 松弛操作：dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j]) *)
 Definition update_dist (i j k: V): program St unit :=
   update' (fun s => s <| dist ::= fun dist0 =>
-    (i, j) !-> (option_min (dist0 (i, j)) (option_plus (dist0 (i, k)) (dist0 (k, j)))); dist0 |>).
+    (i, j) !-> (le_min W_le (dist0 (i, j)) (W_plus (dist0 (i, k)) (dist0 (k, j)))); dist0 |>).
+
+Definition Floyd_j (k: V) (j: V): program St unit :=
+  forset (fun v => vvalid g v) (fun i =>
+    update_dist i j k).
 
 (** 对于固定的中间点k，遍历所有顶点对(i,j)进行松弛 *)
 Definition Floyd_k (k: V): program St unit :=
-    list_iter (original_vlist g) (fun i =>
-      list_iter (original_vlist g) (fun j =>
-          update_dist i j k)).
+  forset (fun v => vvalid g v) (Floyd_j k).
 
 (** Floyd主算法：遍历所有可能的中间点k *)
 Definition Floyd: program St unit :=
-  list_iter (original_vlist g) Floyd_k.
+  forset (fun v => vvalid g v) Floyd_k.
 
 
-(** ===== 循环不变量定义 ===== *)
+(** 
+  ===== 循环不变量 ===== 
+  Floyd算法的核心不变量：
+  在迭代过程中（处理完中间节点集合 done），
+  dist[u][v] 存储的是"中间节点仅限于 done 中的顶点"的最短路径。
+  
+  具体含义：
+  - done 表示已经作为"中间节点"处理过的顶点集合
+  - dist[u][v] = min { weight(p) | p 是从 u 到 v 的路径，且 p 的中间节点都在 done 中 }
+  - 注意：u 和 v 本身不算中间节点，它们是起点和终点
+  
+  循环不变量的演进：
+  - 初始：done = ∅，dist[u][v] 表示不经过任何中间节点的最短路径（即直接边或无穷大）
+  - 处理节点 k 后：done = done ∪ {k}，dist[u][v] 更新为
+      min(dist[u][v], dist[u][k] + dist[k][v])
+    这表示要么不经过 k，要么经过 k 的最短路径
+  - 最终：done = 所有顶点，dist[u][v] 表示真正的最短路径
+*)
 
-(** 辅助定义：前k个顶点构成的集合 *)
-Definition first_k_vertices (k: nat): V -> Prop :=
-  fun v => In v (firstn k (original_vlist g)).
-
-(** k-循环不变量：
-    dist[i][j] 存储的是从 i 到 j 只经过前 k 个顶点作为中间点的最短距离 *)
-Definition k_loop_invariant (k: nat) (s: St): Prop :=
-  (* 对于可达的顶点对：dist正确记录限制距离 *)
-  (forall i j n, 
-    s.(dist) (i, j) = Some n -> 
-    min_weight_distance_in_vset weight g i j (first_k_vertices k) n) /\
-  (* 对于不可达的顶点对：dist为None *)
-  (forall i j,
-    s.(dist) (i, j) = None ->
-    forall p, ~ valid_vpath_in_vset g i p j (first_k_vertices k)).
-
-(** i-循环不变量（外层i循环已处理的部分使用新k，未处理部分使用旧k-1）：
-    - 对于 i0 < i（已处理）: dist[i0][j] = shortestPath(i0, j, k)
-    - 对于 i0 >= i（未处理）: dist[i0][j] = shortestPath(i0, j, k-1) *)
-Definition i_loop_invariant (k: nat) (processed_i: list V) (s: St): Prop :=
-  (* 已处理的行：使用前k个顶点 *)
-  (forall i j n, 
-    In i processed_i ->
-    s.(dist) (i, j) = Some n -> 
-    min_weight_distance_in_vset weight g i j (first_k_vertices k) n) /\
-  (* 未处理的行：使用前k-1个顶点 *)
-  (forall i j n, 
-    ~ In i processed_i ->
-    s.(dist) (i, j) = Some n -> 
-    min_weight_distance_in_vset weight g i j (first_k_vertices (k - 1)) n).
-
-(** j-循环不变量（固定i，外层j循环已处理的部分使用新k，未处理部分使用旧k-1） *)
-Definition j_loop_invariant (k: nat) (i: V) (processed_j: list V) (s: St): Prop :=
-  (* 当前行i中已处理的列：使用前k个顶点 *)
-  (forall j n, 
-    In j processed_j ->
-    s.(dist) (i, j) = Some n -> 
-    min_weight_distance_in_vset weight g i j (first_k_vertices k) n) /\
-  (* 当前行i中未处理的列：使用前k-1个顶点 *)
-  (forall j n, 
-    ~ In j processed_j ->
-    s.(dist) (i, j) = Some n -> 
-    min_weight_distance_in_vset weight g i j (first_k_vertices (k - 1)) n).
-
-(** 初始状态的不变量：dist[i][j] = shortestPath(i, j, 0)
-    即只考虑直接边，不经过任何中间点 *)
-Definition init_invariant (s: St): Prop :=
-  k_loop_invariant 0 s.
-
-(** 终止状态的不变量：dist[i][j] = shortestPath(i, j, |V|)
-    即经过所有顶点，等价于真正的最短距离 *)
-Definition final_invariant (s: St): Prop :=
-  k_loop_invariant (length (original_vlist g)) s.
-
+Definition Floyd_loop_invariant (done: V -> Prop) (s: St): Prop :=
+  forall u v,
+    min_weight_distance_in_vset g u v done (s.(dist) (u, v)).
 
 (** ===== 正确性规范 ===== *)
 
-(** 可达性健全性：如果dist记录了距离n，则n确实是最短距离 *)
-Definition distance_reachable_soundness (s: St): Prop :=
-  forall u v n, s.(dist) (u, v) = Some n -> min_weight_distance weight g u v n.
+(** 健全性：如果dist记录了距离n，则n确实是最短距离 *)
+Definition distance_soundness (s: St): Prop :=
+  forall u v w, s.(dist) (u, v) = w -> min_weight_distance g u v w.
 
-(** 可达性完备性：如果存在最短距离n，则dist正确记录 *)
-Definition distance_reachable_completeness (s: St): Prop :=
-  forall u v n, min_weight_distance weight g u v n -> s.(dist) (u, v) = Some n.
-
-(** 不可达健全性：如果dist为None，则确实不可达 *)
-Definition distance_unreachable_soundness  (s: St): Prop :=
-  forall u v, s.(dist) (u, v) = None -> ~ reachable u v.
-
-(** 不可达完备性：如果不可达，则dist为None *)
-Definition distance_unreachable_completeness (s: St): Prop :=
-  forall u v, ~ reachable u v -> s.(dist) (u, v) = None.
-
-Definition distance_sound (s: St): Prop :=
-  distance_reachable_soundness s /\ distance_unreachable_soundness s.
-
-Definition distance_complete (s: St): Prop :=
-  distance_reachable_completeness s /\ distance_unreachable_completeness s.
+(** 完备性：如果存在最短距离n，则dist正确记录 *)
+Definition distance_completeness (s: St): Prop :=
+  forall u v w, min_weight_distance g u v w -> s.(dist) (u, v) = w.
 
 Definition distance_correct (s: St): Prop :=
-  distance_sound s /\ distance_complete s.
+  distance_soundness s /\ distance_completeness s.
 
 (** ===== 主定理 =====
     
-    证明提示：
-    1. 使用 list_iter 的 Hoare 规则展开循环
-    2. 对k-循环使用不变量：dist[i][j] 表示只经过前k个顶点的最短距离
-    3. 关键引理：
-       - shortest_path_segment: 最短路径的分割性质
-       - shortest_path_triangle_inequality: 三角不等式
-       - path_in_vset_mono: 路径集合的单调性
+    证明 Floyd 算法的正确性：
+    如果初始状态满足空集上的循环不变量，
+    则算法结束后，dist 数组正确记录了所有点对之间的最短距离。
 *)
+
+Definition initialized_state (s: St): Prop := 
+  Floyd_loop_invariant ∅ s.
+
 Theorem Floyd_correct: 
-  Hoare (fun s => s = initSt)
+  Hoare initialized_state
         Floyd
         (fun _ s => distance_correct s).
-Proof. 
+Proof.
+  unfold Floyd. 
+  hoare_cons (Hoare_forset Floyd_loop_invariant).
 Admitted.
 
 

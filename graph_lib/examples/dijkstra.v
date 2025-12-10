@@ -4,176 +4,337 @@ Require Import Coq.Classes.Morphisms.
 Require Import Coq.Logic.Classical_Prop.
 Require Import Coq.micromega.Psatz.
 Require Import SetsClass.SetsClass.
-From ListLib Require Import Basics.
-From GraphLib Require Import graph_basic reachable_basic path vpath.
+From GraphLib Require Import graph_basic reachable_basic path path_basic vpath eweight.
 From MaxMinLib Require Import MaxMin.
-
 
 Import SetsNotation.
 Local Open Scope sets.
 
-Record OriginalGraphType {V: Type} := {
-  original_vlist : list V;
-  original_weight: (V * V) -> option nat;
-}.
+(** 
+  Dijkstra 算法证明所需的辅助引理库
+  
+  本文件提供 Dijkstra 算法正确性证明所需的所有引理，
+  使用抽象的类型类定义，与 eweight.v 保持一致。
+*)
 
-Arguments OriginalGraphType _: clear implicits.
+Section dijkstra_lemmas.
 
-Record OriginalGraphProp {V: Type} (origin: OriginalGraphType V): Prop := {
-  vlist_nodup: NoDup origin.(original_vlist);
-  vlist_in1: forall u v w, original_weight origin (u, v) = Some w -> In u origin.(original_vlist);
-  vlist_in2: forall u v w, original_weight origin (u, v) = Some w -> In v origin.(original_vlist);
-  dist_refl: forall u, original_weight origin (u, u) = Some 0;
-}.
+Context {G V E: Type}
+        {pg: Graph G V E}
+        {gv: GValid G}
+        (g: G).
 
-Arguments OriginalGraphProp _: clear implicits.
+Context {P: Type}
+        {path: Path G V E P}
+        {concatpath: ConcatPath G V E P path}.
 
-Definition original_vvalid {V: Type} (g: OriginalGraphType V) (v: V) := 
-  In v g.(original_vlist).
-
-Definition original_evalid {V: Type} (g: OriginalGraphType V) (e: (V * V)) := 
-  exists w, original_weight g e = Some w.
-
-Record original_step_aux {V: Type} (g: OriginalGraphType V) (e: (V * V)) (x y: V): Prop:=
-{ 
-  original_vx: original_vvalid g x;
-  original_vy: original_vvalid g y;
-  original_ve: original_evalid g e;
-  original_fst: fst e = x;
-  original_snd: snd e = y;
-}.
-
-#[export]Instance OriginalGraph_graph {V: Type} : 
-  Graph (OriginalGraphType V) V (V * V) := {|
-  graph_basic.vvalid := original_vvalid;
-  graph_basic.evalid := original_evalid;
-  graph_basic.step_aux := original_step_aux;
-|}.
-
-#[export]Instance OriginalGraph_gvalid {V: Type} : 
-  GValid (OriginalGraphType V) :=
-  @OriginalGraphProp V.
-
-#[export]Instance OriginalGraph_stepvalid {V: Type}: 
-  StepValid (OriginalGraphType V) V (V * V).
-Proof.
-  split; intros;
-  destruct H; auto.
-Qed.
-
-#[export]Instance OriginalGraph_noemptyedge {V: Type}: 
-  NoEmptyEdge (OriginalGraphType V) V (V * V).
-Proof.
-  split; intros.
-  exists (fst e), (snd e).
-  split; auto;
-  destruct e; simpl in *; 
-  destruct H0; 
-  destruct H. 
-  apply vlist_in3 in H0; auto.
-  apply vlist_in4 in H0; auto.
-Qed.
-
-#[export]Instance OriginalGraph_stepuniquedirected {V: Type}: 
-  StepUniqueDirected (OriginalGraphType V) V (V * V).
-Proof.
-  split. intros. 
-  destruct H0.
-  destruct H1.
-  split; subst; reflexivity.
-Qed. 
-
-#[export]Instance Original_finitegraph {V: Type}:
-  FiniteGraph (OriginalGraphType V) V (V * V). 
-Proof.
-  refine {|graph_basic.listV := original_vlist; |}.
-  auto.
-Defined.
-
-
-Section dijkstra.
-
-Context {V: Type}
-        (g: OriginalGraphType V)
-        (origin_gvalid: OriginalGraph_gvalid g)
-        {P: Type}
-        {path: path.Path (OriginalGraphType V) V (V * V) P}.
+Context {W: Type}
+        (W_le: W -> W -> Prop)
+        {W_le_totalorder: TotalOrder W_le}
+        (W_plus: W -> W -> W)
+        {W_plus_group: Group W_plus}
+        {infweight: InfWeight W_le W_plus}
+        {ew: EdgeWeight G V E W W_le W_plus}.
 
 Notation step := (step g).
 Notation reachable := (reachable g).
 
 
-Definition weight (g: OriginalGraphType V) (u v: V) := (original_weight g) (u, v).
+(** ===== 初始化相关引理 ===== *)
+
+(** 
+  初始状态的最短距离性质
+  
+  对于源点 src：
+  - dist[src] = g_zero，且这是真正的最短距离（空路径）
+  
+  对于其他顶点 v ≠ src：
+  - dist[v] = W_inf，表示通过空集不可达
+*)
+Lemma init_dist_from_source: forall (src: V),
+  min_weight_distance g src src g_zero.
+Admitted.
+
+Lemma init_dist_to_others: forall (src v: V),
+  v <> src ->
+  min_weight_distance_in_vset g src v ∅ W_inf.
+Admitted.
 
 
-Lemma no_multiple_edge: forall x y e1 e2,
-  step_aux g e1 x y -> step_aux g e2 x y -> e1 = e2.
+(** ===== 路径分解引理 ===== *)
+
+(**
+  最短路径的前缀也是最短路径
+  
+  如果 p 是从 u 到 v 的最短路径，且 p 经过顶点 w，
+  那么从 u 到 w 的那段也是最短路径。
+  
+  证明：反证法，如果存在更短的从 u 到 w 的路径，
+  替换后可以得到更短的从 u 到 v 的路径，矛盾。
+*)
+Lemma shortest_path_prefix_shortest: 
+  forall (u v w: V) (p p_prefix: P),
+    min_weight_path g u v p ->
+    (* p_prefix 是 p 的前缀，终点是 w *)
+    is_path g p_prefix u w ->
+    In w (vertex_in_path p) ->
+    (* 则 p_prefix 是最短路径 *)
+    min_weight_path g u w p_prefix.
+Admitted.
+
+(**
+  带顶点集合约束的路径前缀性质
+  
+  类似上面的引理，但考虑中间节点的约束。
+*)
+Lemma shortest_path_in_vset_prefix: 
+  forall (u v w: V) (p p_prefix: P) (vset: V -> Prop),
+    min_weight_path_in_vset g u v vset p ->
+    is_path_through_vset g p_prefix u w vset ->
+    In w (vertex_in_path p) ->
+    min_weight_path_in_vset g u w vset p_prefix.
+Admitted.
+
+
+(** ===== 松弛操作相关引理 ===== *)
+
+(**
+  Dijkstra 松弛操作的正确性
+  
+  假设：
+  - dist[u] 已经是从 src 到 u 的最短距离
+  - dist[v] 是从 src 到 v、仅通过 visited 的最短距离
+  - 存在边 e: u -> v，权重为 w_e
+  
+  则：松弛后 dist[v] = min(dist[v], dist[u] + w_e) 是
+      从 src 到 v、仅通过 visited ∪ {u} 的最短距离
+  
+  证明思路：
+  1. 下界：任何通过 visited ∪ {u} 的路径权重 ≥ min(dist[v], dist[u] + w_e)
+     - 不经过 u：权重 ≥ dist[v]
+     - 经过 u：最短的是 src ~> u -> v，权重 ≥ dist[u] + w_e
+  2. 可达：存在路径达到这个下界
+*)
+Lemma dijkstra_relax_correct:
+  forall (src u v: V) (visited: V -> Prop) (e: E) 
+         (dist_u dist_v w_e: W),
+    (* 前提条件 *)
+    u ∈ visited ->  (* u 已经被访问 *)
+    step_aux g e u v ->  (* 存在边 u -> v *)
+    weight g e = w_e ->
+    (* dist[u] 是最终的最短距离 *)
+    min_weight_distance g src u dist_u ->
+    (* dist[v] 是通过 visited 的最短距离 *)
+    min_weight_distance_in_vset g src v visited dist_v ->
+    (* 结论：松弛后是通过 visited ∪ {u} 的最短距离 *)
+    min_weight_distance_in_vset g src v (visited ∪ [u]) 
+      (le_min W_le dist_v (W_plus dist_u w_e)).
+Admitted.
+
+
+(** ===== 贪心选择的正确性引理 ===== *)
+
+(**
+  贪心选择引理（Dijkstra 算法的核心）
+  
+  假设：
+  - 所有已访问顶点的 dist 值都是最终的最短距离
+  - 所有未访问顶点的 dist 值是仅通过已访问顶点的最短距离
+  - 选择 dist 值最小的未访问顶点 u
+  
+  则：dist[u] 已经是从 src 到 u 的真正最短距离
+  
+  证明（反证法）：
+  假设存在更短的路径 P: src ~> u，权重 < dist[u]。
+  
+  考虑 P 上第一个离开 visited 集合的顶点 v：
+  - v 的前驱 w 在 visited 中
+  - 根据循环不变量，dist[w] = 真正的最短距离到 w
+  - 经过 w 到达 v 的路径权重 ≥ dist[w] + weight(w, v)
+  - 根据循环不变量，dist[v] ≤ dist[w] + weight(w, v)
+    （因为 dist[v] 是通过 visited 的最短距离，包括经过 w 的路径）
+  
+  所以：dist[v] ≤ weight(P 的前缀到 v) < weight(P) < dist[u]
+  
+  但这与"选择了 u"矛盾，因为我们应该选择 dist 值最小的顶点 v。
+  
+  关键：这个证明依赖于边权重非负！
+*)
+Lemma greedy_choice_correct:
+  forall (src u: V) (visited: V -> Prop) (dist: V -> W),
+    (* 前提：循环不变量成立 *)
+    (forall v, v ∈ visited -> min_weight_distance g src v (dist v)) ->
+    (forall v, ~ v ∈ visited -> min_weight_distance_in_vset g src v visited (dist v)) ->
+    (* u 是未访问顶点中 dist 值最小的 *)
+    ~ u ∈ visited ->
+    dist u <> W_inf ->
+    (forall v, ~ v ∈ visited -> dist v <> W_inf -> W_le (dist u) (dist v)) ->
+    (* 结论：dist[u] 是最终的最短距离 *)
+    min_weight_distance g src u (dist u).
+Proof.
+  intros src u visited dist H_visited_correct H_unvisited_optimal 
+         H_u_unvisited H_u_finite H_u_minimal.
+  (* 
+    证明提示：
+    1. 使用反证法：假设存在更短的路径 P
+    2. 分析 P 上第一个离开 visited 的顶点
+    3. 使用非负权重性质
+    4. 推导矛盾
+    
+    需要的辅助引理：
+    - 路径分解：可以在任意顶点分解路径
+    - 权重单调性：部分路径权重 ≤ 完整路径权重（非负权重）
+    - 最短距离的下界性质
+  *)
+Admitted.
+
+
+(** ===== 非负权重的性质引理 ===== *)
+
+(**
+  路径延长不会减少权重（非负权重的关键性质）
+  
+  如果 p1 是 p2 的前缀，则 weight(p1) ≤ weight(p2)
+*)
+Lemma path_extension_weight_monotone:
+  forall (u v w: V) (p_short p_long: P),
+    is_path g p_short u v ->
+    is_path g p_long u w ->
+    In v (vertex_in_path p_long) ->
+    (* p_short 相当于 p_long 的前缀 *)
+    W_le (path_weight g p_short) (path_weight g p_long).
+Admitted.
+
+
+(** ===== 最短距离的基本性质引理 ===== *)
+
+(**
+  三角不等式
+  
+  从 u 到 w 的最短距离 ≤ 从 u 到 v 的最短距离 + 从 v 到 w 的最短距离
+*)
+Lemma triangle_inequality:
+  forall (u v w: V) (d_uw d_uv d_vw: W),
+    min_weight_distance g u w d_uw ->
+    min_weight_distance g u v d_uv ->
+    min_weight_distance g v w d_vw ->
+    W_le d_uw (W_plus d_uv d_vw).
+Admitted.
+
+(**
+  带边的三角不等式
+  
+  如果存在边 e: u -> v，则 dist[v] ≤ dist[u] + weight(e)
+*)
+Lemma triangle_inequality_with_edge:
+  forall (src u v: V) (e: E) (d_u d_v: W),
+    step_aux g e u v ->
+    min_weight_distance g src u d_u ->
+    min_weight_distance g src v d_v ->
+    W_le d_v (W_plus d_u (weight g e)).
+Admitted.
+
+
+(** ===== 最短距离的唯一性 ===== *)
+
+Lemma min_distance_unique: 
+  forall u v w1 w2,
+    min_weight_distance g u v w1 ->
+    min_weight_distance g u v w2 ->
+    w1 = w2.
 Proof.
   intros.
-  destruct H.
-  destruct H0.
-  destruct e1, e2.
-  subst; simpl in *; subst.
-  reflexivity.
+  unfold min_weight_distance in *.
+  eapply min_default_unique; eauto.
 Qed.
 
-Lemma path_slice_trans: forall (i j k: V) (p1 p2: list V), 
-  valid_vpath g i p1 j -> 
-  valid_vpath g j p2 k -> 
-  valid_vpath g i (p1 ++ p2) k.
+Lemma min_distance_in_vset_unique: 
+  forall u v vset w1 w2,
+    min_weight_distance_in_vset g u v vset w1 ->
+    min_weight_distance_in_vset g u v vset w2 ->
+    w1 = w2.
+Proof.
+  intros.
+  unfold min_weight_distance_in_vset in *.
+  eapply min_default_unique; eauto.
+Qed.
+
+
+(** ===== 可达性和有限性的关系 ===== *)
+
+(**
+  如果 dist[v] 不是无穷大，则 v 从 src 可达
+*)
+Lemma finite_dist_implies_reachable:
+  forall (src v: V) (vset: V -> Prop) (d: W),
+    min_weight_distance_in_vset g src v vset d ->
+    d <> W_inf ->
+    exists p, is_path_through_vset g p src v vset.
 Admitted.
 
-Lemma path_slice_length: forall (k: V) (p1 p2: list V), 
-  vpath_weight weight g (p1 ++ k :: p2) = option_plus (vpath_weight weight g (p1 ++ k :: nil)) (vpath_weight weight g (k :: p2)).
-Admitted. 
-
-Lemma shortest_path_prefix_shortest: forall (i j k: V) (p p1: list V), 
-  p1 is_a_prefix_of p -> 
-  nth_error p1 (length p1 - 1)  = Some k ->
-  min_weight_vpath weight g i p j -> 
-  min_weight_vpath weight g i p1 k.
+(**
+  如果 v 从 src 不可达（通过 vset），则 dist[v] = W_inf
+*)
+Lemma unreachable_implies_inf:
+  forall (src v: V) (vset: V -> Prop),
+    (forall p, ~ is_path_through_vset g p src v vset) ->
+    min_weight_distance_in_vset g src v vset W_inf.
 Admitted.
 
-Lemma shortest_path_suffix_shortest: forall (i j k: V) (p p2: list V), 
-  p2 is_a_suffix_of p ->
-  hd_error p2 = Some k ->
-  min_weight_vpath weight g i p j -> 
-  min_weight_vpath weight g k p2 j.
-Admitted.
 
-Lemma shortest_path_all_shortest: forall (i j k l: V) (p p1 p2: list V), 
-  p1 is_a_prefix_of p -> 
-  p2 is_a_suffix_of p1 -> 
-  hd_error p2 = Some k -> 
-  nth_error p2 (length p2 - 1) = Some l -> 
-  min_weight_vpath weight g i p j ->
-  min_weight_vpath weight g k p2 l.
-Admitted.
+(** ===== 终止性相关引理 ===== *)
 
-Lemma shortest_path_is_simple: forall (i j: V) (p: list V), 
-  min_weight_vpath weight g i p j ->
-  NoDup p.
-Admitted.
-
-Lemma shortest_path_segment: forall (i j k: V) (p: list V) (cur: V -> Prop),
-  ~ k ∈ cur ->
-  min_weight_vpath_in_vset weight g i p j (cur ∪ [k]) -> 
-  In k p -> 
-  exists p1 p2, p = p1 ++ k :: p2 /\
-  min_weight_vpath_in_vset weight g i p1 k cur /\
-  min_weight_vpath_in_vset weight g k p2 j cur.
-Admitted.
-
-Lemma path_in_vset_mono: forall (i j k: V) (p: list V) (cur: V -> Prop),
-  min_weight_vpath_in_vset weight g i p j cur ->
-  min_weight_vpath_in_vset weight g i p k (cur ∪ [k]).
-Admitted.
+(**
+  终止条件下的正确性
   
-Lemma shortest_path_triangle_inequality: forall (i j k: V) (n n1 n2: nat), 
-  min_weight_distance weight g i j n ->
-  min_weight_distance weight g i k n1 ->
-  min_weight_distance weight g k j n2 ->
-  option_le (Some n) (option_plus (Some n1) (Some n2)).
+  当算法终止时（所有可达顶点都已访问），
+  循环不变量蕴含完整的正确性。
+*)
+Lemma termination_implies_soundness:
+  forall (src: V) (visited: V -> Prop) (dist: V -> W),
+    (* 循环不变量 *)
+    (forall v, v ∈ visited -> min_weight_distance g src v (dist v)) ->
+    (forall v, ~ v ∈ visited -> min_weight_distance_in_vset g src v visited (dist v)) ->
+    (* 终止条件：所有有限距离的顶点都已访问 *)
+    (forall v, dist v <> W_inf -> v ∈ visited) ->
+    (* 结论：健全性成立 *)
+    forall v w, dist v = w -> min_weight_distance g src v w.
 Admitted.
 
-End dijkstra.
+Lemma termination_implies_completeness:
+  forall (src: V) (visited: V -> Prop) (dist: V -> W),
+    (* 循环不变量 *)
+    (forall v, v ∈ visited -> min_weight_distance g src v (dist v)) ->
+    (forall v, ~ v ∈ visited -> min_weight_distance_in_vset g src v visited (dist v)) ->
+    (* 终止条件 *)
+    (forall v, dist v <> W_inf -> v ∈ visited) ->
+    (* 结论：完备性成立 *)
+    forall v w, min_weight_distance g src v w -> dist v = w.
+Admitted.
+
+
+(** ===== 辅助引理：集合和路径的关系 ===== *)
+
+(**
+  路径集合的单调性
+*)
+Lemma path_set_monotone:
+  forall (u v: V) (vset1 vset2: V -> Prop) (p: P),
+    is_path_through_vset g p u v vset1 ->
+    vset1 ⊆ vset2 ->
+    is_path_through_vset g p u v vset2.
+Admitted.
+
+(**
+  最短距离的单调性
+*)
+Lemma min_distance_vset_monotone:
+  forall (u v: V) (vset1 vset2: V -> Prop) (d1 d2: W),
+    min_weight_distance_in_vset g u v vset1 d1 ->
+    min_weight_distance_in_vset g u v vset2 d2 ->
+    vset1 ⊆ vset2 ->
+    W_le d2 d1.
+Admitted.
+
+End dijkstra_lemmas.
+

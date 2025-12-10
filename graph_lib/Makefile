@@ -17,7 +17,11 @@ DEP_FLAG = -Q $(CURRENT_DIR) GraphLib \
 		   -R ../ListLib ListLib
 
 BASE_FILES = graph_basic.v Syntax.v GraphLib.v
-REACHABLE_FILES = reachable/reachable_basic.v reachable/reachable_restricted.v reachable/path_basic.v reachable/path.v reachable/vpath.v reachable/epath.v
+REACHABLE_FILES = \
+reachable/reachable_basic.v reachable/reachable_restricted.v \
+reachable/path_basic.v reachable/path.v \
+reachable/vpath.v reachable/epath.v \
+reachable/eweight.v
 DIRECTED_FILES = directed/rootedtree.v 
 SUBGRAPH_FILES = subgraph/subgraph.v
 UNDIRECTED_FILES = undirected/undirected_basic.v undirected/tree.v

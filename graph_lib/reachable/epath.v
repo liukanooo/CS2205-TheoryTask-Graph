@@ -5,7 +5,7 @@ Require Import Coq.Arith.Wf_nat.
 Require Import Coq.Logic.Classical_Prop.
 Require Import Coq.micromega.Psatz.
 Require Import SetsClass.SetsClass.
-From GraphLib Require Import GraphLib path.
+From GraphLib Require Import graph_basic path.
 
 Import SetsNotation.
 
@@ -34,22 +34,6 @@ Definition simple_circuit (g: G) (e: list E) (u: V): Prop :=
 
 Definition have_simple_circuit (g: G) : Prop :=
   exists u p, simple_epath g u p u.
-
-Lemma In_three_parts {X: Type}: forall (x: X) l,
-  In x l ->
-  exists l1 l2, l = l1 ++ x :: l2.
-Proof.
-  intros.
-  revert x H.
-  induction l; intros.
-  * simpl in *; subst; exfalso; auto.
-  * destruct (classic (x = a)) as [Heq | Hneq].
-    ** subst.
-       exists nil ; exists l; split; auto.
-    ** destruct H; subst; try congruence. 
-       apply IHl in H as [l1 [l2]].
-       exists (a :: l1), l2; subst; auto.
-Qed.
 
 Lemma valid_path_evalid: forall g p u v,
   valid_epath g u p v ->

@@ -1,7 +1,7 @@
 Require Import GraphLib.graph_basic.
 Require Import GraphLib.reachable.reachable_basic.
 Require Import GraphLib.reachable.reachable_restricted.
-Require Import GraphLib.reachable.path_basic.
+Require Import GraphLib.reachable.epath.
 Require Import SetsClass.
 (* g1 is the subgraph of g2 *)
 Definition subgraph 
@@ -162,7 +162,7 @@ End SUBGRAGH.
 
 
 
-Require Export Coq.Classes.EquivDec.
+(* Require Export Coq.Classes.EquivDec.
 
 Section GRAPH_OPERATIONS.
 
@@ -300,4 +300,4 @@ Proof.
          * destruct H as [[? []]|[? []]]; subst; [|apply step_sym]; auto. }
 Qed.
 
-End GRAPH_OPERATIONS.
+End GRAPH_OPERATIONS. *)
