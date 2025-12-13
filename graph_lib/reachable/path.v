@@ -3,6 +3,7 @@ Require Import Coq.Lists.List.
 Require Import Lia.
 Require Import Coq.Logic.Classical.
 Require Import Coq.Arith.Arith.
+Require Import ListLib.Base.Positional.
 From GraphLib Require Import graph_basic reachable_basic Syntax.
 
 Import ListNotations.
@@ -21,11 +22,6 @@ Record vpath_iff_epath_prop
             nth_error pv (S n) = Some v ->
             step_aux g e u v;
 }.
-
-(* tl_error整理到ListLib里面 *)
-
-Definition tl_error {A: Type}(l: list A): option A := 
-    nth_error l (length l - 1).
 
 Class Path 
     (G V E: Type) 
@@ -96,7 +92,7 @@ Class ConcatPath
 
 Inductive path_destruct_1n {P E V: Type} :=
 | DestructBase1n (v: V)               
-| DestructStep1n (p: P) (e: E) (v: V). 
+| DestructStep1n (p: P) (u v: V) (e: E). 
 
 Class Destruct1nPath 
     (G V E: Type) 
@@ -112,18 +108,17 @@ Class Destruct1nPath
         match destruct_1n_path p with
         | DestructBase1n v => 
             p = empty_path v
-        | DestructStep1n p e v =>
-            exists u,
-              path_valid g p /\
-              head p = u /\
+        | DestructStep1n p' u v e =>
+              path_valid g p' /\
+              head p' = v /\
               step_aux g e u v /\
-              p = concat_path (single_path u v e) p
+              p = concat_path (single_path u v e) p'
         end;
 }.
 
 Inductive path_destruct_n1 {P E V: Type} :=
 | DestructBasen1 (p: P) (v: V)
-| DestructStepn1 (p: P) (e: E) (v: V).
+| DestructStepn1 (p: P) (u v: V) (e: E).
 
 Class Destructn1Path 
     (G V E: Type) 
@@ -137,17 +132,18 @@ Class Destructn1Path
     destruct_n1_path: P -> path_destruct_n1;
     destruct_n1_spec: forall g p, path_valid g p ->
         match destruct_n1_path p with
-        | DestructBasen1 p v =>
+        | DestructBasen1 p' v =>
             p = empty_path v
-        | DestructStepn1 p e v =>
-            exists u,
-            path_valid g p /\
-            tail p = u /\
+        | DestructStepn1 p' u v e =>
+            path_valid g p' /\
+            tail p' = u /\
             step_aux g e u v /\
-            p = concat_path p (single_path u v e)
+            p = concat_path p' (single_path u v e)
         end;
 }.
-
+Print list_ind.
+Print list_rec.
+(* Type -> Prop ? *)
 Class PathInd1n 
     (G V E: Type) 
     `{pg: Graph G V E} 
@@ -157,14 +153,15 @@ Class PathInd1n
     (ep: EmptyPath G V E P p) 
     (sp: SinglePath G V E P p) 
     (cp: ConcatPath G V E P p) := {
-    path_ind1n: forall g (P: P -> Type) 
-    (H1: forall v, P (empty_path v)) 
-    (H2: forall u v e a2, step_aux g e u v -> 
+    path_ind1n: forall g (X: P -> Type) 
+    (H1: forall v, X (empty_path v)) 
+    (H2: forall u v e a2, 
+    step_aux g e u v -> 
     path_valid g a2 ->
     head a2 = v ->
-    P a2 -> 
-    P (concat_path (single_path u v e) a2)), 
-    forall a, path_valid g a -> P a;
+    X a2 -> 
+    X (concat_path (single_path u v e) a2)), 
+    forall a, path_valid g a -> X a;
 }.
 
 Class PathIndn1 (G V E: Type) `{pg: Graph G V E} `{gv: GValid G} 
@@ -173,12 +170,12 @@ Class PathIndn1 (G V E: Type) `{pg: Graph G V E} `{gv: GValid G}
     (ep: EmptyPath G V E P p) 
     (sp: SinglePath G V E P p) 
     (cp: ConcatPath G V E P p) := {
-    path_indn1: forall g (P: P -> Type) 
-    (H1: forall v, P (empty_path v)) 
+    path_indn1: forall g (X: P -> Type) 
+    (H1: forall v, X (empty_path v)) 
     (H2: forall u v e a1, step_aux g e u v -> 
     path_valid g a1 ->
     tail a1 = v ->
-    P a1 -> 
-    P (concat_path a1 (single_path u v e))), 
-    forall a, path_valid g a -> P a;
+    X a1 -> 
+    X (concat_path a1 (single_path u v e))), 
+    forall a, path_valid g a -> X a;
 }.

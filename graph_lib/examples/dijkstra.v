@@ -4,11 +4,13 @@ Require Import Coq.Classes.Morphisms.
 Require Import Coq.Logic.Classical_Prop.
 Require Import Coq.micromega.Psatz.
 Require Import SetsClass.SetsClass.
-From GraphLib Require Import graph_basic reachable_basic path path_basic vpath eweight.
-From MaxMinLib Require Import MaxMin.
+From GraphLib Require Import graph_basic reachable_basic path path_basic epath Zweight.
+From MaxMinLib Require Import MaxMin Interface.
 
 Import SetsNotation.
+
 Local Open Scope sets.
+Local Open Scope Z.
 
 (** 
   Dijkstra 算法证明所需的辅助引理库
@@ -17,7 +19,7 @@ Local Open Scope sets.
   使用抽象的类型类定义，与 eweight.v 保持一致。
 *)
 
-Section dijkstra_lemmas.
+Section dijkstra.
 
 Context {G V E: Type}
         {pg: Graph G V E}
@@ -26,15 +28,12 @@ Context {G V E: Type}
 
 Context {P: Type}
         {path: Path G V E P}
-        {concatpath: ConcatPath G V E P path}.
+        {emptypath: EmptyPath G V E P path}
+        {singlepath: SinglePath G V E P path}
+        {concatpath: ConcatPath G V E P path}
+        {destruct1npath: Destruct1nPath G V E P path emptypath singlepath concatpath}.
 
-Context {W: Type}
-        (W_le: W -> W -> Prop)
-        {W_le_totalorder: TotalOrder W_le}
-        (W_plus: W -> W -> W)
-        {W_plus_group: Group W_plus}
-        {infweight: InfWeight W_le W_plus}
-        {ew: EdgeWeight G V E W W_le W_plus}.
+Context {ew: EdgeWeight G E}.
 
 Notation step := (step g).
 Notation reachable := (reachable g).
@@ -52,12 +51,12 @@ Notation reachable := (reachable g).
   - dist[v] = W_inf，表示通过空集不可达
 *)
 Lemma init_dist_from_source: forall (src: V),
-  min_weight_distance g src src g_zero.
+  min_weight_distance g src src (Some 0).
 Admitted.
 
 Lemma init_dist_to_others: forall (src v: V),
   v <> src ->
-  min_weight_distance_in_vset g src v ∅ W_inf.
+  min_weight_distance_in_vset g src v ∅ None.
 Admitted.
 
 
@@ -117,7 +116,7 @@ Admitted.
 *)
 Lemma dijkstra_relax_correct:
   forall (src u v: V) (visited: V -> Prop) (e: E) 
-         (dist_u dist_v w_e: W),
+         (dist_u dist_v w_e: option Z),
     (* 前提条件 *)
     u ∈ visited ->  (* u 已经被访问 *)
     step_aux g e u v ->  (* 存在边 u -> v *)
@@ -128,7 +127,7 @@ Lemma dijkstra_relax_correct:
     min_weight_distance_in_vset g src v visited dist_v ->
     (* 结论：松弛后是通过 visited ∪ {u} 的最短距离 *)
     min_weight_distance_in_vset g src v (visited ∪ [u]) 
-      (le_min W_le dist_v (W_plus dist_u w_e)).
+      (Z_op_min dist_v (Z_op_plus dist_u w_e)).
 Admitted.
 
 
@@ -161,14 +160,14 @@ Admitted.
   关键：这个证明依赖于边权重非负！
 *)
 Lemma greedy_choice_correct:
-  forall (src u: V) (visited: V -> Prop) (dist: V -> W),
+  forall (src u: V) (visited: V -> Prop) (dist: V -> option Z),
     (* 前提：循环不变量成立 *)
     (forall v, v ∈ visited -> min_weight_distance g src v (dist v)) ->
     (forall v, ~ v ∈ visited -> min_weight_distance_in_vset g src v visited (dist v)) ->
     (* u 是未访问顶点中 dist 值最小的 *)
     ~ u ∈ visited ->
-    dist u <> W_inf ->
-    (forall v, ~ v ∈ visited -> dist v <> W_inf -> W_le (dist u) (dist v)) ->
+    dist u <> None ->
+    (forall v, ~ v ∈ visited -> dist v <> None -> Z_op_le (dist u) (dist v)) ->
     (* 结论：dist[u] 是最终的最短距离 *)
     min_weight_distance g src u (dist u).
 Proof.
@@ -202,7 +201,7 @@ Lemma path_extension_weight_monotone:
     is_path g p_long u w ->
     In v (vertex_in_path p_long) ->
     (* p_short 相当于 p_long 的前缀 *)
-    W_le (path_weight g p_short) (path_weight g p_long).
+    Z_op_le (path_weight g p_short) (path_weight g p_long).
 Admitted.
 
 
@@ -214,11 +213,11 @@ Admitted.
   从 u 到 w 的最短距离 ≤ 从 u 到 v 的最短距离 + 从 v 到 w 的最短距离
 *)
 Lemma triangle_inequality:
-  forall (u v w: V) (d_uw d_uv d_vw: W),
+  forall (u v w: V) (d_uw d_uv d_vw: option Z),
     min_weight_distance g u w d_uw ->
     min_weight_distance g u v d_uv ->
     min_weight_distance g v w d_vw ->
-    W_le d_uw (W_plus d_uv d_vw).
+    Z_op_le d_uw (Z_op_plus d_uv d_vw).
 Admitted.
 
 (**
@@ -227,37 +226,12 @@ Admitted.
   如果存在边 e: u -> v，则 dist[v] ≤ dist[u] + weight(e)
 *)
 Lemma triangle_inequality_with_edge:
-  forall (src u v: V) (e: E) (d_u d_v: W),
+  forall (src u v: V) (e: E) (d_u d_v: option Z),
     step_aux g e u v ->
     min_weight_distance g src u d_u ->
     min_weight_distance g src v d_v ->
-    W_le d_v (W_plus d_u (weight g e)).
+    Z_op_le d_v (Z_op_plus d_u (weight g e)).
 Admitted.
-
-
-(** ===== 最短距离的唯一性 ===== *)
-
-Lemma min_distance_unique: 
-  forall u v w1 w2,
-    min_weight_distance g u v w1 ->
-    min_weight_distance g u v w2 ->
-    w1 = w2.
-Proof.
-  intros.
-  unfold min_weight_distance in *.
-  eapply min_default_unique; eauto.
-Qed.
-
-Lemma min_distance_in_vset_unique: 
-  forall u v vset w1 w2,
-    min_weight_distance_in_vset g u v vset w1 ->
-    min_weight_distance_in_vset g u v vset w2 ->
-    w1 = w2.
-Proof.
-  intros.
-  unfold min_weight_distance_in_vset in *.
-  eapply min_default_unique; eauto.
-Qed.
 
 
 (** ===== 可达性和有限性的关系 ===== *)
@@ -266,9 +240,9 @@ Qed.
   如果 dist[v] 不是无穷大，则 v 从 src 可达
 *)
 Lemma finite_dist_implies_reachable:
-  forall (src v: V) (vset: V -> Prop) (d: W),
+  forall (src v: V) (vset: V -> Prop) (d: option Z),
     min_weight_distance_in_vset g src v vset d ->
-    d <> W_inf ->
+    d <> None ->
     exists p, is_path_through_vset g p src v vset.
 Admitted.
 
@@ -278,7 +252,7 @@ Admitted.
 Lemma unreachable_implies_inf:
   forall (src v: V) (vset: V -> Prop),
     (forall p, ~ is_path_through_vset g p src v vset) ->
-    min_weight_distance_in_vset g src v vset W_inf.
+    min_weight_distance_in_vset g src v vset None.
 Admitted.
 
 
@@ -291,23 +265,23 @@ Admitted.
   循环不变量蕴含完整的正确性。
 *)
 Lemma termination_implies_soundness:
-  forall (src: V) (visited: V -> Prop) (dist: V -> W),
+  forall (src: V) (visited: V -> Prop) (dist: V -> option Z),
     (* 循环不变量 *)
     (forall v, v ∈ visited -> min_weight_distance g src v (dist v)) ->
     (forall v, ~ v ∈ visited -> min_weight_distance_in_vset g src v visited (dist v)) ->
     (* 终止条件：所有有限距离的顶点都已访问 *)
-    (forall v, dist v <> W_inf -> v ∈ visited) ->
+    (forall v, dist v <> None -> v ∈ visited) ->
     (* 结论：健全性成立 *)
     forall v w, dist v = w -> min_weight_distance g src v w.
 Admitted.
 
 Lemma termination_implies_completeness:
-  forall (src: V) (visited: V -> Prop) (dist: V -> W),
+  forall (src: V) (visited: V -> Prop) (dist: V -> option Z),
     (* 循环不变量 *)
     (forall v, v ∈ visited -> min_weight_distance g src v (dist v)) ->
     (forall v, ~ v ∈ visited -> min_weight_distance_in_vset g src v visited (dist v)) ->
     (* 终止条件 *)
-    (forall v, dist v <> W_inf -> v ∈ visited) ->
+    (forall v, dist v <> None -> v ∈ visited) ->
     (* 结论：完备性成立 *)
     forall v w, min_weight_distance g src v w -> dist v = w.
 Admitted.
@@ -329,12 +303,12 @@ Admitted.
   最短距离的单调性
 *)
 Lemma min_distance_vset_monotone:
-  forall (u v: V) (vset1 vset2: V -> Prop) (d1 d2: W),
+  forall (u v: V) (vset1 vset2: V -> Prop) (d1 d2: option Z),
     min_weight_distance_in_vset g u v vset1 d1 ->
     min_weight_distance_in_vset g u v vset2 d2 ->
     vset1 ⊆ vset2 ->
-    W_le d2 d1.
+    Z_op_le d2 d1.
 Admitted.
 
-End dijkstra_lemmas.
+End dijkstra.
 

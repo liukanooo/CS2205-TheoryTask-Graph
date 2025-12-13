@@ -6,7 +6,7 @@ Require Import Coq.micromega.Psatz.
 Require Import SetsClass.SetsClass.
 From RecordUpdate Require Import RecordUpdate.
 From MonadLib.StateRelMonad Require Import StateRelBasic StateRelHoare FixpointLib.
-From GraphLib Require Import graph_basic reachable_basic path vpath eweight.
+From GraphLib Require Import graph_basic reachable_basic path path_basic epath Zweight.
 From MaxMinLib Require Import MaxMin.
 Require Import Algorithms.MapLib.
 
@@ -15,7 +15,7 @@ Import MonadNotation.
 Local Open Scope sets.
 Local Open Scope monad.
 Local Open Scope map_scope.
-Local Open Scope nat.
+Local Open Scope Z.
 
 Section Dijkstra.
 
@@ -41,15 +41,13 @@ Context {G V E: Type}
         {eq_dec: EqDec V eq}.
 
 Context {P: Type}
-        {path: Path G V E P}.
+        {path: Path G V E P}
+        {emptypath: EmptyPath G V E P path}
+        {singlepath: SinglePath G V E P path}
+        {concatpath: ConcatPath G V E P path}
+        {destruct1npath: Destruct1nPath G V E P path emptypath singlepath concatpath}.
 
-Context {W: Type}
-        (W_le: W -> W -> Prop)
-        {W_le_totalorder: TotalOrder W_le}
-        (W_plus: W -> W -> W)
-        {W_plus_group: Group W_plus}
-        {infweight: InfWeight W_le W_plus}
-        {ew: EdgeWeight G V E W W_le W_plus}.
+Context {ew: EdgeWeight G E}.
 
 Notation step := (step g).
 Notation reachable := (reachable g).
@@ -57,7 +55,7 @@ Notation reachable := (reachable g).
 (** 状态记录：已访问顶点集合 + 距离数组 *)
 Record St: Type := mkSt {
   visited: V -> Prop;  (** 已访问的顶点集合 *)
-  dist: V -> W;        (** 当前记录的距离，W_inf表示不可达 *)
+  dist: V -> option Z;        (** 当前记录的距离，W_inf表示不可达 *)
 }.
 
 Context (src: V)  (** 源点 *)
@@ -68,7 +66,7 @@ Instance: Settable St := settable! mkSt <visited; dist>.
 (** 初始状态：源点距离为 g_zero，其他顶点距离为 W_inf *)
 Definition initSt: St := {|
   visited := ∅;
-  dist := fun v => if eq_dec v src then g_zero else W_inf;
+  dist := fun v => if eq_dec v src then Some 0 else None;
 |}.
 
 (** 将顶点u标记为已访问 *)
@@ -80,7 +78,7 @@ Definition relax_edge (u: V) (e: E): program St unit :=
   assume (fun s => exists v, step_aux g e u v);;
   v <- get (fun s v => step_aux g e u v);;
   update' (fun s => s <| dist ::= fun dist0 =>
-    v !-> (le_min W_le (dist0 v) (W_plus (dist0 u) (weight g e))); dist0 |>).
+    v !-> (le_min Z_op_le (dist0 v) (Z_op_plus (dist0 u) (weight g e))); dist0 |>).
 
 (** 处理顶点u：标记为已访问，然后松弛所有出边 *)
 Definition process_vertex (u: V): program St unit :=
@@ -89,12 +87,12 @@ Definition process_vertex (u: V): program St unit :=
     (relax_edge u).
 
 (** 未访问且距离有限的顶点 *)
-Definition unvisited_reachable (s: St) (u: V): Prop :=
-  vvalid g u /\ ~ u ∈ s.(visited) /\ s.(dist) u <> W_inf.
+Definition unvisited (s: St) (u: V): Prop :=
+  vvalid g u /\ ~ u ∈ s.(visited).
 
 (** 选择距离最小的未访问可达顶点 *)
 Definition select_min_vertex: program St V :=
-  get (fun s u => min_object_of_subset W_le (fun v => unvisited_reachable s v) (s.(dist)) u).
+  get (fun s u => min_object_of_subset Z_op_le (fun v => unvisited s v) (s.(dist)) u).
 
 (** Dijkstra主算法：重复选择和处理顶点，直到没有未访问的可达顶点 *)
 Definition Dijkstra: program St unit :=
@@ -149,7 +147,7 @@ Definition unvisited_dist_optimal (s: St): Prop :=
   这是初始条件，也是算法的基础。
 *)
 Definition source_dist_zero (s: St): Prop :=
-  s.(dist) src = g_zero.
+  s.(dist) src = Some 0.
 
 (** 
   不变量 4: 有效性约束
@@ -185,8 +183,8 @@ Definition loop_invariant (s: St): Prop :=
     这个性质保证了贪心策略的正确性。
 *)
 Definition greedy_choice_correct (s: St) (u: V): Prop :=
-  unvisited_reachable s u ->
-  (forall v, unvisited_reachable s v -> W_le (s.(dist) u) (s.(dist) v)) ->
+  unvisited s u ->
+  (forall v, unvisited s v -> Z_op_le (s.(dist) u) (s.(dist) v)) ->
   min_weight_distance g src u (s.(dist) u).
 
 

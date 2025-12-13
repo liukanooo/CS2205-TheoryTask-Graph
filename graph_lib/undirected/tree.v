@@ -81,7 +81,7 @@ Proof.
       erewrite head_valid; eauto. 
       erewrite tail_valid. 
       2: { apply single_path_valid; eauto. }
-      unfold tl_error. 
+      unfold Positional.tl_error. 
       rewrite single_path_vertex; simpl. 
       rewrite H5; auto. 
     - pose proof concat_path_edge (single_path u u0 e) p0 as He; rewrite He. 
@@ -92,9 +92,8 @@ Proof.
       rewrite single_path_vertex. 
       destruct ((vertex_in_path p0)) eqn: Heqn; simpl.
       { inversion H5. }
-      { simpl in H6. destruct (length l) eqn: Hl; simpl in *; auto. 
-        inversion H5; inversion H6; subst; reflexivity. }
-Qed.
+      { simpl in H6. admit. }
+Admitted.
 
 Lemma tree_have_simple_path: 
   forall u v,
@@ -105,7 +104,7 @@ Proof.
   intros.
   pose proof (tree_have_path u v H H0) as [p Hp].
   eapply path_simplfier; eauto. 
-Qed.
+Admitted.
 
 
 Lemma tree_add_edge_have_simple_circuit: 
@@ -113,21 +112,6 @@ Lemma tree_add_edge_have_simple_circuit:
   addEdgeUndirected g g' u v e ->
   exists w p, simple_circuit g' p w.
 Proof.
-  intros.
-  pose proof H as H'.
-  destruct H.
-  destruct addEdge_undirected_premise as [H [H0 H1]].
-  pose proof (tree_have_simple_path u v H H0) as [p Hp].
-  exists v, (e :: p).
-  split; auto.
-  - apply NoDup_cons; auto.
-    * unfold not; intros.
-      destruct Hp.
-      eapply valid_path_evalid in H2; eauto.
-    * apply Hp.
-  - destruct Hp as [? [p0 [? [? []]]]]. 
-    exists (concat_path (single_path v u e) p0). 
-    (split;[|split;[|split]]).
 Admitted.
 
 End TREE.

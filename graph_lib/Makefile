@@ -21,7 +21,7 @@ REACHABLE_FILES = \
 reachable/reachable_basic.v reachable/reachable_restricted.v \
 reachable/path_basic.v reachable/path.v \
 reachable/vpath.v reachable/epath.v \
-reachable/eweight.v
+reachable/Zweight.v reachable/eweight.v
 DIRECTED_FILES = directed/rootedtree.v 
 SUBGRAPH_FILES = subgraph/subgraph.v
 UNDIRECTED_FILES = undirected/undirected_basic.v undirected/tree.v

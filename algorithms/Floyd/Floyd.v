@@ -7,7 +7,7 @@ Require Import Coq.micromega.Psatz.
 Require Import SetsClass.SetsClass.
 From RecordUpdate Require Import RecordUpdate.
 From MonadLib.StateRelMonad Require Import StateRelBasic StateRelHoare FixpointLib.
-From GraphLib Require Import graph_basic reachable_basic path vpath eweight.
+From GraphLib Require Import graph_basic reachable_basic path path_basic epath Zweight.
 From MaxMinLib Require Import MaxMin.
 Require Import Algorithms.MapLib.
 
@@ -39,21 +39,19 @@ Context {G V E: Type}
         {eq_dec: EqDec (V * V) eq}.
 
 Context {P: Type}
-        {path: Path G V E P}.
+        {path: Path G V E P}
+        {emptypath: EmptyPath G V E P path}
+        {singlepath: SinglePath G V E P path}
+        {concatpath: ConcatPath G V E P path}
+        {destruct1npath: Destruct1nPath G V E P path emptypath singlepath concatpath}.
 
-Context {W: Type}
-        (W_le: W -> W -> Prop)
-        {W_le_totalorder: TotalOrder W_le}
-        (W_plus: W -> W -> W)
-        {W_plus_group: Group W_plus}
-        {infweight: InfWeight W_le W_plus}
-        {ew: EdgeWeight G V E W W_le W_plus}.
+Context {ew: EdgeWeight G E}.
 
 Notation step := (step g).
 Notation reachable := (reachable g).
 
 Record St: Type := mkSt {
-  dist: (V * V) -> W;
+  dist: (V * V) -> option Z;
 }.
 
 Instance: Settable St := settable! mkSt <dist>.
@@ -62,7 +60,7 @@ Instance: Settable St := settable! mkSt <dist>.
 (** 松弛操作：dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j]) *)
 Definition update_dist (i j k: V): program St unit :=
   update' (fun s => s <| dist ::= fun dist0 =>
-    (i, j) !-> (le_min W_le (dist0 (i, j)) (W_plus (dist0 (i, k)) (dist0 (k, j)))); dist0 |>).
+    (i, j) !-> (Z_op_min (dist0 (i, j)) (Z_op_plus (dist0 (i, k)) (dist0 (k, j)))); dist0 |>).
 
 Definition Floyd_j (k: V) (j: V): program St unit :=
   forset (fun v => vvalid g v) (fun i =>

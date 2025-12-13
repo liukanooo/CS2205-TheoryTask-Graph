@@ -9,7 +9,7 @@ Require Import SetsClass.SetsClass.
 From GraphLib Require Import GraphLib path vpath path_basic.
 From MaxMinLib Require Import MaxMin. 
 
-Class Group 
+Class CommMonoid 
     {W: Type} 
     (plus: W -> W -> W) := {
     g_zero: W;
@@ -25,7 +25,7 @@ Class InfWeight
     (W_le: W -> W -> Prop)
     (W_plus: W -> W -> W)
     {W_le_totalorder: TotalOrder W_le}
-    {W_plus_group: Group W_plus}
+    {W_plus_group: CommMonoid W_plus}
     := 
 {
     W_inf: W;
@@ -36,15 +36,8 @@ Class InfWeight
 
 
 Class EdgeWeight 
-    (G V E: Type) 
-    (W: Type)
-    (W_le: W -> W -> Prop)
-    {W_le_totalorder: TotalOrder W_le}
-    (W_plus: W -> W -> W)
-    {W_plus_group: Group W_plus}
-    {infweight: InfWeight W_le W_plus}
-    `{pg: Graph G V E} 
-    `{gv: GValid G} := {
+    (G E: Type) 
+    (W: Type) := {
   weight: G -> E -> W;
 }.
 
@@ -57,12 +50,12 @@ Context {G V E: Type}
         {W_le: W -> W -> Prop}
         {W_le_totalorder: TotalOrder W_le}
         {W_plus: W -> W -> W}
-        {W_plus_group: Group W_plus}
+        {W_plus_comm_monoid: CommMonoid W_plus}
         {infweight: InfWeight W_le W_plus}
         {P: Type}
         {pg: Graph G V E} 
         {gv: GValid G}
-        {ew: EdgeWeight G V E W W_le W_plus}
+        {ew: EdgeWeight G E W}
         {path: Path G V E P}.
 
 Parameter Wlist_sum: list W -> W.

@@ -6,6 +6,7 @@ Require Import Coq.Arith.Wf_nat.
 Require Import Coq.Logic.Classical_Prop.
 Require Import Coq.micromega.Psatz.
 Require Import SetsClass.SetsClass.
+Require Import ListLib.Base.Positional.
 From GraphLib Require Import GraphLib path.
 
 Import SetsNotation.
@@ -18,14 +19,14 @@ Context {G V E: Type}
         {pg: Graph G V E} 
         {gv: GValid G}
         {A: Type}
-        {path: @Path G V E pg gv A}
-        {emptypath: @EmptyPath G V E pg gv A path}
-        {singlepath: @SinglePath G V E pg gv A path}
-        {concatpath: @ConcatPath G V E pg gv A path}
-        {destruct1npath: @Destruct1nPath G V E pg gv A path emptypath singlepath concatpath}
-        {destructn1path: @Destructn1Path G V E pg gv A path emptypath singlepath concatpath}
-        {ind1npath: @PathInd1n G V E pg gv A path emptypath singlepath concatpath}
-        {indn1path: @PathIndn1 G V E pg gv A path emptypath singlepath concatpath}.
+        {path: Path G V E A}
+        {emptypath: EmptyPath G V E A path}
+        {singlepath: SinglePath G V E A path}
+        {concatpath: ConcatPath G V E A path}
+        {destruct1npath: Destruct1nPath G V E A path emptypath singlepath concatpath}
+        {destructn1path: Destructn1Path G V E A path emptypath singlepath concatpath}
+        {ind1npath: PathInd1n G V E A path emptypath singlepath concatpath}
+        {indn1path: PathIndn1 G V E A path emptypath singlepath concatpath}.
 
 Definition valid_vpath: 
   G -> V -> list V -> V -> Prop := 
@@ -205,21 +206,7 @@ Lemma valid_vpath_app_inv:
   valid_vpath g u (p1 ++ v :: p2) w ->
   valid_vpath g u (p1 ++ v :: nil) v /\ valid_vpath g v (v :: p2) w. 
 Proof.
-  (* intros.
-  destruct H as [P [? [? []]]].
-  pose proof destruct_path_vertex g v P p1 p2 H H0 as [Q1 [Q2 [? [? []]]]].
-  pose proof destruct_path_valid g P Q1 Q2 H H3 as [? []].
-  split; [exists Q1|exists Q2]; (split; [|split; [|split]]); auto.
-  - destruct p1; simpl in *; auto. 
-  - rewrite length_app; simpl.
-    replace (length p1 + 1 - 1) with (length p1) by lia. 
-    rewrite nth_error_app2 by lia. 
-    replace (length p1 - length p1) with 0 by lia. auto. 
-  - rewrite nth_error_app2 in H2. 
-    rewrite length_app in H2; simpl in *. 
-    replace (length p1 + S (length p2) - 1 - length p1) with (length p2 - 0) in H2 by lia. auto. 
-    rewrite length_app; simpl; lia.
-Qed. *)
+  (* 整体的证明结构需要优化 *)
 Admitted.
 
 Lemma valid_vpath_inv_1n:
