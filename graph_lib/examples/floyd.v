@@ -6,8 +6,7 @@ Require Import Coq.Logic.Classical_Prop.
 Require Import Coq.micromega.Psatz.
 Require Import SetsClass.SetsClass.
 From GraphLib Require Import graph_basic reachable_basic path path_basic epath Zweight.
-From MaxMinLib Require Import MaxMin.
-Require Import Algorithms.MapLib.
+From MaxMinLib Require Import MaxMin Interface.
 
 Import SetsNotation.
 Local Open Scope sets.
@@ -18,8 +17,7 @@ Section floyd.
 Context {G V E: Type}
         {pg: Graph G V E}
         {gv: GValid G}
-        (g: G)
-        {eq_dec: EqDec (V * V) eq}.
+        (g: G).
 
 Context {P: Type}
         {path: Path G V E P}

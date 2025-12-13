@@ -28,7 +28,7 @@ Context {G V E: Type}
         {path: Path G V E P}.
 
 Definition Zlist_sum: list (option Z) -> option Z :=
-    fold_right Z_op_plus None.
+    fold_right Z_op_plus (Some 0).
 
 (* 路径的权重和函数 *)
 Definition path_weight (g: G) (p: P): option Z :=

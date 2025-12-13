@@ -82,13 +82,18 @@ SETS_FILES=$(SETS_FILE_NAMES:%.v=$(SETS_DIR)/%.v)
 SETS_TEST=$(SETS_TEST_FILES:%.v=$(SETS_DIR)/%.v)
 
 # ListLib files
-LISTLIB_FILE_NAMES = \
-    Core.v \
+LISTLIB_BASE_FILES = \
     Inductive.v \
-    Positional.v \
-    Basics.v
+    Positional.v
 
-LISTLIB_FILES=$(LISTLIB_FILE_NAMES:%.v=$(LISTLIB_DIR)/%.v)
+LISTLIB_GENERAL_FILES = \
+    Forall.v \
+    IndexedElements.v \
+    Length.v \
+    Presuffix.v
+
+LISTLIB_FILES=$(LISTLIB_BASE_FILES:%.v=$(LISTLIB_DIR)/Base/%.v) \
+              $(LISTLIB_GENERAL_FILES:%.v=$(LISTLIB_DIR)/General/%.v)
 
 # RecordUpdate files
 RECORDUPDATE_FILE_NAMES = \
@@ -113,6 +118,7 @@ FIXEDPOINTS_FILES=$(FIXEDPOINTS_FILE_NAMES:%.v=$(FIXEDPOINTS_DIR)/%.v)
 
 # MaxMinLib files
 MAXMINLIB_FILE_NAMES = \
+    Interface.v \
     MaxMin.v
 
 MAXMINLIB_FILES=$(MAXMINLIB_FILE_NAMES:%.v=$(MAXMINLIB_DIR)/%.v)
@@ -169,6 +175,7 @@ GRAPH_LIB_FILE_NAMES = \
     reachable/vpath.v \
     reachable/epath.v \
     reachable/eweight.v \
+    reachable/Zweight.v \
     directed/rootedtree.v \
     subgraph/subgraph.v \
     undirected/undirected_basic.v \
@@ -255,6 +262,25 @@ $(EXLISTLIB_FILES:%.v=%.vo): %.vo: %.v
 # Main target
 all: $(FILES:%.v=%.vo)
 
+# Help target
+help:
+	@echo "Available targets:"
+	@echo "  all      - Build all Coq files (default)"
+	@echo "  clean    - Remove all compiled files"
+	@echo "  depend   - Generate dependency file"
+	@echo "  _CoqProject - Generate _CoqProject file"
+	@echo ""
+	@echo "Modules:"
+	@echo "  - SetsClass (sets/)"
+	@echo "  - ListLib (ListLib/)"
+	@echo "  - RecordUpdate (coq-record-update/src/)"
+	@echo "  - Fixedpoints (fixedpoints/)"
+	@echo "  - MaxMinLib (MaxMinLib/)"
+	@echo "  - MonadLib (monadlib/)"
+	@echo "  - GraphLib (graph_lib/)"
+	@echo "  - Algorithms (algorithms/)"
+	@echo "  - ExListLib (ExListLib/)"
+
 # Generate _CoqProject file
 _CoqProject:
 	@echo $(DEP_FLAG) > _CoqProject
@@ -268,17 +294,21 @@ depend: $(FILES)
 
 # Clean compiled files
 clean:
-	@rm -f *.glob */*.glob */*/*.glob
-	@rm -f *.vo */*.vo */*/*.vo
-	@rm -f *.vok */*.vok */*/*.vok
-	@rm -f *.vos */*.vos */*/*.vos
-	@rm -f .*.aux */.*.aux */*/.*.aux
+	@rm -f *.glob */*.glob */*/*.glob */*/*/*.glob
+	@rm -f *.vo */*.vo */*/*.vo */*/*/*.vo
+	@rm -f *.vok */*.vok */*/*.vok */*/*/*.vok
+	@rm -f *.vos */*.vos */*/*.vos */*/*/*.vos
+	@rm -f .*.aux */.*.aux */*/.*.aux */*/*/.*.aux
 	@rm -f .depend
 	@rm -f $(MONADLIB_DIR)/*/*.vo $(MONADLIB_DIR)/*/*.glob $(MONADLIB_DIR)/*/*.vos $(MONADLIB_DIR)/*/*.vok $(MONADLIB_DIR)/*/.*.aux
 	@rm -f $(RECORDUPDATE_DIR)/*.vo $(RECORDUPDATE_DIR)/*.glob $(RECORDUPDATE_DIR)/*.vos $(RECORDUPDATE_DIR)/*.vok $(RECORDUPDATE_DIR)/.*.aux
+	@rm -f $(LISTLIB_DIR)/*/*.vo $(LISTLIB_DIR)/*/*.glob $(LISTLIB_DIR)/*/*.vos $(LISTLIB_DIR)/*/*.vok $(LISTLIB_DIR)/*/.*.aux
+	@rm -f $(GRAPH_LIB_DIR)/*/*.vo $(GRAPH_LIB_DIR)/*/*.glob $(GRAPH_LIB_DIR)/*/*.vos $(GRAPH_LIB_DIR)/*/*.vok $(GRAPH_LIB_DIR)/*/.*.aux
+	@rm -f $(GRAPH_LIB_DIR)/*/*/*.vo $(GRAPH_LIB_DIR)/*/*/*.glob $(GRAPH_LIB_DIR)/*/*/*.vos $(GRAPH_LIB_DIR)/*/*/*.vok $(GRAPH_LIB_DIR)/*/*/.*.aux
+	@rm -f $(ALGORITHMS_DIR)/*/*.vo $(ALGORITHMS_DIR)/*/*.glob $(ALGORITHMS_DIR)/*/*.vos $(ALGORITHMS_DIR)/*/*.vok $(ALGORITHMS_DIR)/*/.*.aux
 	@echo "Cleaned all compiled files"
 
-.PHONY: all clean depend _CoqProject
+.PHONY: all clean depend _CoqProject help
 .DEFAULT_GOAL := all
 
 -include .depend

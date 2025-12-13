@@ -6,9 +6,9 @@ Require Import Coq.micromega.Psatz.
 Require Import SetsClass.SetsClass.
 From RecordUpdate Require Import RecordUpdate.
 From MonadLib.StateRelMonad Require Import StateRelBasic StateRelHoare FixpointLib.
-From GraphLib Require Import graph_basic reachable_basic reachable_restricted path path_basic vpath eweight.
+From GraphLib Require Import graph_basic reachable_basic reachable_restricted path path_basic vpath Zweight.
 From GraphLib.undirected Require Import tree.
-From MaxMinLib Require Import MaxMin. 
+From MaxMinLib Require Import MaxMin Interface. 
 Require Import Algorithms.MapLib.
 
 Import SetsNotation.
@@ -17,7 +17,7 @@ Import MonadNotation.
 Local Open Scope sets.
 Local Open Scope monad.
 Local Open Scope map_scope.
-Local Open Scope nat.
+Local Open Scope Z.
 
 Section Kruskal.
 
@@ -44,15 +44,13 @@ Context {G V E: Type}
         {eq_dec_E: EqDec E eq}.
 
 Context {P: Type}
-        {path: Path G V E P}.
+        {path: Path G V E P}
+        {emptypath: EmptyPath G V E P path}
+        {singlepath: SinglePath G V E P path}
+        {concatpath: ConcatPath G V E P path}
+        {destruct1npath: Destruct1nPath G V E P path emptypath singlepath concatpath}.
 
-Context {W: Type}
-        (W_le: W -> W -> Prop)
-        {W_le_totalorder: TotalOrder W_le}
-        (W_plus: W -> W -> W)
-        {W_plus_group: Group W_plus}
-        {infweight: InfWeight W_le W_plus}
-        {ew: EdgeWeight G V E W W_le W_plus}.
+Context {ew: EdgeWeight G E}.
 
 Record St: Type := mkSt {
   mst_edges: list E;  (** 当前选中的边集 *)
@@ -74,7 +72,7 @@ Definition forms_cycle (s: St) (e: E): Prop :=
 
 (** 从所有有效且不形成环的边中选择权重最小的 *)
 Definition get_min_edge (f: St -> E -> Prop): program St E :=
-  get (fun s e => min_object_of_subset W_le (fun e => f s e) (weight g) e).
+  get (fun s e => min_object_of_subset Z_op_le (fun e => f s e) (weight g) e).
 
 (** 可选边：有效边且不形成环 *)
 Definition selectable_edge (s: St) (e: E): Prop :=
@@ -93,8 +91,8 @@ Definition Kruskal: program St unit :=
 (** ===== 辅助定义 ===== *)
 
 (** 边集的总权重 *)
-Definition total_weight (s: St): W :=
-  fold_right (fun e l => W_plus (weight g e) l) g_zero s.(mst_edges).
+Definition total_weight (s: St): option Z :=
+  fold_right (fun e l => Z_op_plus (weight g e) l) (Some 0) s.(mst_edges).
 
 
 (** ===== 生成树和最小生成树定义 ===== *)
@@ -102,7 +100,7 @@ Definition total_weight (s: St): W :=
 Parameter is_spanning_tree: St -> Prop.
 
 Definition is_mst (s: St): Prop :=
-  min_object_of_subset W_le is_spanning_tree total_weight s.
+  min_object_of_subset Z_op_le is_spanning_tree total_weight s.
   
 Theorem Kruskal_correct: 
   Hoare (fun s => s = initSt)

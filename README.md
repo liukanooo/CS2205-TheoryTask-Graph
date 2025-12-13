@@ -30,7 +30,6 @@ git submodule update --init --recursive
 │   ├── Floyd/            # Floyd算法  
 │   ├── Prim/             # Prim算法
 │   ├── Kruskal/          # Kruskal算法
-│   ├── MapLib.v          # 映射操作辅助库
 │   └── makefile
 │
 ├── monadlib/             # Monad程序库

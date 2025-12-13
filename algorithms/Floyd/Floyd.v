@@ -8,7 +8,7 @@ Require Import SetsClass.SetsClass.
 From RecordUpdate Require Import RecordUpdate.
 From MonadLib.StateRelMonad Require Import StateRelBasic StateRelHoare FixpointLib.
 From GraphLib Require Import graph_basic reachable_basic path path_basic epath Zweight.
-From MaxMinLib Require Import MaxMin.
+From MaxMinLib Require Import MaxMin Interface.
 Require Import Algorithms.MapLib.
 
 Import SetsNotation.
