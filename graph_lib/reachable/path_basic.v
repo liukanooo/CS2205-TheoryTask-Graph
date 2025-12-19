@@ -19,29 +19,25 @@ Context {G V E: Type}
         {pg: Graph G V E}
         {gv: GValid G}
         {path: Path G V E P}
-        {singlepath: SinglePath G V E P path}. 
+        {emptypath: EmptyPath G V E P path}
+        {singlepath: SinglePath G V E P path}
+        {concatpath: ConcatPath G V E P path}. 
 
 Definition is_path (g: G) (p: P) (u v: V): Prop :=
   path_valid g p /\ head p = u /\ tail p = v.
 
+Definition is_empty_path (p: P): Prop :=
+  exists v, p = empty_path v.
+
 Definition is_path_through_vset (g: G) (p: P) (u v: V) (vset: V -> Prop): Prop :=
   is_path g p u v /\ 
-    forall w, In w (vertex_in_path p) -> vset w \/ w = u \/ w = v.
+    forall x, x ∈ vset <-> exists p1 p2, ~ is_empty_path p1 /\ ~ is_empty_path p2 /\ 
+    concat_path p1 p2 = p.
 
 Lemma through_empty_vset: forall g u v e,
   step_aux g e u v <->
   is_path_through_vset g (single_path u v e) u v ∅.
 Proof.
-  intros; split; intros. 
-  - split. 
-    * split; [|split]. 
-      ** apply single_path_valid; auto.
-      ** admit. 
-      ** admit. 
-    * intros. 
-      rewrite single_path_vertex in H0. 
-      destruct H0; subst. 
-      tauto. admit. 
 Admitted.
 
 End path.

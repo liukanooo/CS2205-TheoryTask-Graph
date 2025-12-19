@@ -69,10 +69,11 @@ Lemma path_decompose_at_vertex: forall (u v k: V) (p: P) (vset: V -> Prop),
 Admitted.
 
 (** 通过 vset 的路径，可以扩展到通过 vset ∪ {k} 的路径集合 *)
-Lemma path_vset_mono: forall (u v k: V) (p: P) (vset: V -> Prop),
+(* 这个lemma不一定需要 *)
+(* Lemma path_vset_mono: forall (u v k: V) (p: P) (vset: V -> Prop),
   is_path_through_vset g p u v vset ->
   is_path_through_vset g p u v (vset ∪ [k]).
-Admitted.
+Admitted. *)
 
 (** ===== 最短路径基本性质引理 ===== *)
 

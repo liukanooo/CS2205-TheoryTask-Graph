@@ -35,6 +35,16 @@ Definition valid_epath:
     hd_error (vertex_in_path P) = Some u /\ 
     tl_error (vertex_in_path P)= Some v.
 
+(* 我们也可以基于epath而不是path进行定义和证明。 *)
+Definition is_epath_through_vset:
+  G -> V -> list E -> V -> (V -> Prop) -> Prop :=
+  fun g u p v vset =>
+    valid_epath g u p v /\ 
+    forall x, x ∈ vset <-> exists p1 p2, p1 <> nil /\ p2 <> nil /\ p1 ++ p2 = p /\ 
+    valid_epath g x p1 v /\ valid_epath g v p2 x.
+
+
+
 Lemma empty_path_edge: forall (g: G) v,
   edge_in_path (empty_path v) = nil.
 Proof.
