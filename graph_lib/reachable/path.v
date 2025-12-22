@@ -179,3 +179,19 @@ Class PathIndn1 (G V E: Type) `{pg: Graph G V E} `{gv: GValid G}
     X (concat_path a1 (single_path u v e))), 
     forall a, path_valid g a -> X a;
 }.
+
+Lemma Some_inversion {A: Type}: 
+    forall (x y: A), Some x = Some y -> x = y.
+Proof.
+  intros.
+  inversion H.
+  reflexivity.
+Qed.
+
+Lemma Some_injection {A: Type}: 
+    forall (x y: A), x = y -> Some x = Some y.
+Proof.
+  intros.
+  subst.
+  reflexivity.
+Qed.

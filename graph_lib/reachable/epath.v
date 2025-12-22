@@ -1,17 +1,18 @@
 Require Import Coq.Lists.List.
 Require Import Coq.Classes.Morphisms.
-Require Import Coq.Arith.PeanoNat.
-Require Import Coq.Arith.Wf_nat.
+Require Import Coq.ZArith.ZArith.
 Require Import Coq.Logic.Classical_Prop.
 Require Import Coq.micromega.Psatz.
 Require Import SetsClass.SetsClass.
 Require Import ListLib.Base.Positional.
 Require Import ListLib.Base.Inductive.
-From GraphLib Require Import graph_basic reachable_basic path.
+From GraphLib Require Import graph_basic reachable_basic path Zweight.
+From MaxMinLib Require Import MaxMin Interface.
 
 Import SetsNotation.
 
 Local Open Scope sets.
+Local Open Scope Z.
 
 Section EPATH.
 
@@ -35,15 +36,6 @@ Definition valid_epath:
     hd_error (vertex_in_path P) = Some u /\ 
     tl_error (vertex_in_path P)= Some v.
 
-(* 我们也可以基于epath而不是path进行定义和证明。 *)
-Definition is_epath_through_vset:
-  G -> V -> list E -> V -> (V -> Prop) -> Prop :=
-  fun g u p v vset =>
-    valid_epath g u p v /\ 
-    forall x, x ∈ vset <-> exists p1 p2, p1 <> nil /\ p2 <> nil /\ p1 ++ p2 = p /\ 
-    valid_epath g x p1 v /\ valid_epath g v p2 x.
-
-
 
 Lemma empty_path_edge: forall (g: G) v,
   edge_in_path (empty_path v) = nil.
@@ -52,7 +44,7 @@ Proof.
   pose proof (vpath_iff_epath g (empty_path v) (empty_path_valid g v)) as [Hlen _].
   rewrite empty_path_vertex in Hlen.
   simpl in Hlen.
-  assert (length (edge_in_path (empty_path v)) = 0) by lia.
+  assert (length (edge_in_path (empty_path v)) = 0%nat) by lia.
   rewrite length_zero_iff_nil in H. 
   auto.
 Qed.
@@ -431,5 +423,42 @@ Lemma path_simplfier
   exists q, simple_epath g u q v.
 Proof.
 Admitted.
+
+
+(* 我们也可以基于epath而不是path进行最短路径的定义和证明。 *)
+
+Context {ew: EdgeWeight G E}.
+
+(* vset就等于path去掉首尾后的所有点的集合 *)
+Definition is_epath_through_exactly_vset 
+  (g: G) (u: V) (p: list E) (v: V) (vset: V -> Prop): Prop :=
+  valid_epath g u p v /\ 
+  forall x, x ∈ vset <-> 
+  exists p1 p2, 
+    p1 <> nil /\ 
+    p2 <> nil /\ 
+    p1 ++ p2 = p /\ 
+    valid_epath g x p1 v /\ 
+    valid_epath g v p2 x. 
+
+(* vset是path中间节点可以经过的节点集合，但是这个定义相比Path上的定义比较抽象 *)
+Definition is_epath_through_vset
+  (g: G) (u: V) (p: list E) (v: V) (vset: V -> Prop): Prop :=
+  forall S, is_epath_through_exactly_vset g u p v S -> vset ⊆ S. 
+
+Definition epath_weight (g: G) (p: list E): option Z :=
+  fold_right Z_op_plus (Some 0) (map (weight g) p). 
+
+Definition min_object_weight_epath (g: G) (u: V) (v: V) (p: list E): Prop :=
+  min_object_of_subset Z_op_le (fun p => valid_epath g u p v) (epath_weight g) p. 
+
+Definition min_value_weight_epath (g: G) (u: V) (v: V) (z: option Z): Prop :=
+  min_value_of_subset_with_default Z_op_le (fun p => valid_epath g u p v) (epath_weight g) None z. 
+
+Definition min_object_weight_epath_in_vset (g: G) (u: V) (v: V) (vset: V -> Prop) (p: list E): Prop :=
+  min_object_of_subset Z_op_le (fun p => is_epath_through_vset g u p v vset) (epath_weight g) p. 
+
+Definition min_value_weight_epath_in_vset (g: G) (u: V) (v: V) (vset: V -> Prop) (z: option Z): Prop :=
+  min_value_of_subset_with_default Z_op_le (fun p => is_epath_through_vset g u p v vset) (epath_weight g) None z. 
 
 End EPATH.

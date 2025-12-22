@@ -199,11 +199,8 @@ ALGORITHMS_FILES=$(ALGORITHMS_FILE_NAMES:%.v=$(ALGORITHMS_DIR)/%.v)
 
 # ExListLib files (optional - if needed)
 EXLISTLIB_FILE_NAMES = \
-    ZList.v \
     InvertalList.v \
-    Nperm.v \
-    Presuffix.v \
-    Sorting.v
+    Nperm.v 
 
 EXLISTLIB_FILES=$(EXLISTLIB_FILE_NAMES:%.v=$(EXLISTLIB_DIR)/%.v)
 

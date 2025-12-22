@@ -6,7 +6,7 @@ Require Import Coq.Arith.Wf_nat.
 Require Import Coq.Logic.Classical_Prop.
 Require Import Coq.micromega.Psatz.
 Require Import SetsClass.SetsClass.
-From GraphLib Require Import GraphLib path vpath path_basic.
+From GraphLib Require Import GraphLib path path_basic.
 From MaxMinLib Require Import MaxMin Interface. 
 
 Local Open Scope Z.
@@ -32,6 +32,27 @@ Context {G V E: Type}
 
 Definition Zlist_sum: list (option Z) -> option Z :=
     fold_right Z_op_plus (Some 0).
+
+Lemma Zlist_sum_cons: 
+    forall (a: option Z) (l: list (option Z)),
+    Zlist_sum (a :: l) = Z_op_plus a (Zlist_sum l).
+Proof.
+  intros.
+  simpl.
+  destruct a; simpl; auto.
+Qed.
+
+Lemma Zlist_sum_app: 
+    forall (l1 l2: list (option Z)),
+    Zlist_sum (l1 ++ l2) = Z_op_plus (Zlist_sum l1) (Zlist_sum l2).
+Proof.
+  intros.
+  induction l1. 
+  - simpl. destruct (Zlist_sum l2); reflexivity. 
+  - simpl. rewrite IHl1. 
+    destruct (Zlist_sum l1); destruct (Zlist_sum l2); destruct a; simpl; auto. 
+    f_equal. lia. 
+Qed.
 
 (* 路径的权重和函数 *)
 Definition path_weight (g: G) (p: P): option Z :=
