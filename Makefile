@@ -90,7 +90,8 @@ LISTLIB_GENERAL_FILES = \
     Forall.v \
     IndexedElements.v \
     Length.v \
-    Presuffix.v
+    Presuffix.v \
+    NoDup.v
 
 LISTLIB_FILES=$(LISTLIB_BASE_FILES:%.v=$(LISTLIB_DIR)/Base/%.v) \
               $(LISTLIB_GENERAL_FILES:%.v=$(LISTLIB_DIR)/General/%.v)
